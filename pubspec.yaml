@@ -1,6 +1,6 @@
 name: shape_theme_switcher
 description: An ThemeData switcher which clips an shape through the view on change
-version: 0.0.1
+version: 0.0.2
 homepage:
 
 environment:

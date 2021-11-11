@@ -9,6 +9,7 @@ class ShapeThemeSwitcher extends StatefulWidget {
   final Widget child;
   final Alignment alignment;
   final ShapeBorderTween borderTween;
+  final Duration duration;
   ShapeThemeSwitcher({
     Key? key,
     required this.theme,
@@ -16,6 +17,7 @@ class ShapeThemeSwitcher extends StatefulWidget {
     ShapeBorderTween? borderTween,
     ShapeBorder? border = const CircleBorder(),
     this.alignment = Alignment.bottomRight,
+    this.duration = const Duration(milliseconds: 200),
   })  : borderTween =
             borderTween ?? ShapeBorderTween(begin: border!, end: border),
         super(key: key);
@@ -31,7 +33,6 @@ class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
   ui.Image? oldThemedImage;
   late final _controller = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 1000),
   )..addStatusListener(_onAnimationStatus);
   late final _animation = CurvedAnimation(
     parent: _controller,
@@ -62,6 +63,7 @@ class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
       oldThemedImage = image;
       theme = widget.theme;
     });
+    _controller.duration = widget.duration;
     _controller.forward(from: 0);
   }
 
@@ -101,6 +103,7 @@ class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
         child: RawImage(
           image: oldThemedImage,
           scale: 1.0,
+          fit: BoxFit.fill,
         ),
       ),
     );
