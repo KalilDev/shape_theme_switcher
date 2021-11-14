@@ -1,6 +1,6 @@
 name: shape_theme_switcher
 description: An ThemeData switcher which clips an shape through the view on change
-version: 0.0.2
+version: 0.0.3
 homepage:
 
 environment:
@@ -14,6 +14,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  synchronized:
   flutter_lints: ^1.0.0
 
 # For information on the generic Dart part of this file, see the

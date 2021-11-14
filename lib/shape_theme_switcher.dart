@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:synchronized/synchronized.dart';
 import 'dart:ui' as ui;
 
 class ShapeThemeSwitcher extends StatefulWidget {
@@ -28,6 +30,7 @@ class ShapeThemeSwitcher extends StatefulWidget {
 
 class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
     with SingleTickerProviderStateMixin {
+  final _bodyKey = GlobalKey();
   final _boundaryKey = GlobalKey();
   late ThemeData theme;
   ui.Image? oldThemedImage;
@@ -45,6 +48,10 @@ class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
     }
     setState(() => oldThemedImage = null);
     _controller.value = 0;
+    if (theme != widget.theme) {
+      // The theme changed during the transition.
+      _scheduleTriggerThemeChange();
+    }
   }
 
   void initState() {
@@ -52,13 +59,50 @@ class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
     theme = widget.theme;
   }
 
+  final imageLock = Lock();
+
   void _triggerThemeChange() {
+    if (_controller.isAnimating) {
+      // _triggerThemeChange was called during an animation.
+      // wait for it to finish to trigger another change.
+      return;
+    }
+    if (theme == widget.theme) {
+      // an image may have failed
+      return;
+    }
     final renderBoundary = _boundaryKey.currentContext!.findRenderObject()
         as RenderRepaintBoundary;
-    renderBoundary.toImage().then(_onImageReady);
+    imageLock.synchronized(() async {
+      try {
+        if (oldThemedImage != null || _controller.isAnimating) {
+          return;
+        }
+        if (theme == widget.theme) {
+          return;
+        }
+        final image = await renderBoundary
+            .toImage(pixelRatio: ui.window.devicePixelRatio)
+            .timeout(Duration(seconds: 2));
+        _onImageReady(image);
+      } on Object catch (e) {
+        print(e);
+        if (_controller.isAnimating) {
+          return;
+        }
+        setState(() {
+          oldThemedImage = null;
+          theme = widget.theme;
+        });
+      }
+    });
   }
 
   void _onImageReady(ui.Image image) {
+    if (theme == widget.theme) {
+      // the theme changed back before the image got ready
+      return;
+    }
     setState(() {
       oldThemedImage = image;
       theme = widget.theme;
@@ -67,18 +111,25 @@ class _ShapeThemeSwitcherState extends State<ShapeThemeSwitcher>
     _controller.forward(from: 0);
   }
 
+  void _scheduleTriggerThemeChange() =>
+      WidgetsBinding.instance!.addPostFrameCallback(
+        (_) => _triggerThemeChange(),
+      );
+
   void didUpdateWidget(ShapeThemeSwitcher old) {
-    if (old.theme != widget.theme) {
-      WidgetsBinding.instance!
-          .addPostFrameCallback((_) => _triggerThemeChange());
-    }
     super.didUpdateWidget(old);
+    if (old.theme != widget.theme) {
+      _scheduleTriggerThemeChange();
+    }
   }
 
   Widget _body(BuildContext context) {
     var bodyWithTargetTheme = Theme(
       data: theme,
-      child: widget.child,
+      child: KeyedSubtree(
+        key: _bodyKey,
+        child: widget.child,
+      ),
     );
     if (oldThemedImage == null) {
       return bodyWithTargetTheme;
@@ -153,5 +204,7 @@ class PositionedShapeClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(PositionedShapeClipper oldClipper) =>
-      t != oldClipper.t || origin != oldClipper.origin;
+      t != oldClipper.t ||
+      origin != oldClipper.origin ||
+      shape != oldClipper.shape;
 }
